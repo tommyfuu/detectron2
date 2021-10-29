@@ -33,7 +33,7 @@ setup_logger()
 # pip install torchvision==0.9.1
 
 # wget http://images.cocodataset.org/val2017/000000439715.jpg -q -O input.jpg
-im = cv2.imread("/mnt/biology/donaldson/tom/detectron2_trial/researchSU19-187+cropped.jpeg")
+im = cv2.imread("/Users/chenlianfu/Documents/Github/detectron2/researchSU19-187+cropped.jpeg")
 # cv2_imshow(im)
 
 # create a detectron2 config and a detectron2 DefaultPredictor to run inference on this image
