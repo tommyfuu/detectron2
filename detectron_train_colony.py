@@ -3,6 +3,8 @@
 # pip install detectron2 -f https://dl.fbaipublicfiles.com/detectron2/wheels/cu111/torch1.9/index.html
 
 # check pytorch installation:
+from detectron2.utils.visualizer import ColorMode
+from detectron2.engine import DefaultTrainer
 from detectron2.data.catalog import Metadata
 from AGAR_representative.adapt_AGAR_to_coco import agar_to_coco_format
 import random
@@ -71,18 +73,71 @@ agar_metadata = MetadataCatalog.get("lower-resolution")
 
 
 # attempt to print a training data
-dataset_dicts = agar_to_coco_format("./AGAR_representative/higher-resolution/bright", 'jpg')[0]
-print(dataset_dicts)
-d = dataset_dicts[2]
-img = cv2.imread(d["file_name"])
-visualizer = Visualizer(img[:, :, ::-1], metadata=agar_metadata, scale=0.5)
-print(visualizer)
-print(d)
-out = visualizer.draw_dataset_dict(d)
-print(out.get_image().shape)
-print(out.get_image())
-print("AAAAAH")
-print(out.get_image()[:, :, ::-1].shape)
-print(out.get_image()[:, :, ::-1])
-# cv2.imshow('', out.get_image()[:, :, ::-1])
-cv2.imwrite('./testing_training_new.jpg', out.get_image()[:, :, ::-1])
+# dataset_dicts = agar_to_coco_format("./AGAR_representative/higher-resolution/bright", 'jpg')[0]
+# print(dataset_dicts)
+# d = dataset_dicts[2]
+# img = cv2.imread(d["file_name"])
+# visualizer = Visualizer(img[:, :, ::-1], metadata=agar_metadata, scale=0.5)
+# print(visualizer)
+# print(d)
+# out = visualizer.draw_dataset_dict(d)
+# print(out.get_image().shape)
+# print(out.get_image())
+# print("AAAAAH")
+# print(out.get_image()[:, :, ::-1].shape)
+# print(out.get_image()[:, :, ::-1])
+# # cv2.imshow('', out.get_image()[:, :, ::-1])
+# cv2.imwrite('./testing_training_new.jpg', out.get_image()[:, :, ::-1])
+
+
+# try training
+print("Start training", "aha")
+cfg = get_cfg()
+cfg.merge_from_file(model_zoo.get_config_file(
+    "COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"))
+cfg.DATASETS.TRAIN = ("agar_higher-resolution/bright", "agar_higher-resolution/vague")
+cfg.DATASETS.TEST = ()
+cfg.DATALOADER.NUM_WORKERS = 2
+cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(
+    "COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml")  # Let training initialize from model zoo
+cfg.SOLVER.IMS_PER_BATCH = 2
+cfg.SOLVER.BASE_LR = 0.00025  # pick a good LR
+# 300 iterations seems good enough for this toy dataset; you will need to train longer for a practical dataset
+cfg.SOLVER.MAX_ITER = 300
+cfg.SOLVER.STEPS = []        # do not decay learning rate
+# faster, and good enough for this toy dataset (default: 512)
+cfg.MODEL.ROI_HEADS.BATCH_SIZE_PER_IMAGE = 128
+# only has one class (ballon). (see https://detectron2.readthedocs.io/tutorials/datasets.html#update-the-config-for-new-datasets)
+cfg.MODEL.ROI_HEADS.NUM_CLASSES = 1
+cfg.MODEL.DEVICE = 'cpu'
+# NOTE: this config means the number of classes, but a few popular unofficial tutorials incorrect uses num_classes+1 here.
+
+os.makedirs(cfg.OUTPUT_DIR, exist_ok=True)
+trainer = DefaultTrainer(cfg)
+print("check point", "aha")
+trainer.resume_or_load(resume=False)
+trainer.train()
+
+
+# Inference should use the config with parameters that are used in training
+# cfg now already contains everything we've set previously. We changed it a little bit for inference:
+# path to the model we just trained
+cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "model_final.pth")
+cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.7   # set a custom testing threshold
+predictor = DefaultPredictor(cfg)
+
+
+dataset_dicts = agar_to_coco_format("./AGAR_representative/higher-resolution/dark", 'jpg')[0]
+num = 1
+for d in random.sample(dataset_dicts, 3):
+    im = cv2.imread(d["file_name"])
+    # format is documented at https://detectron2.readthedocs.io/tutorials/models.html#model-output-format
+    outputs = predictor(im)
+    v = Visualizer(im[:, :, ::-1],
+                   metadata=agar_metadata,
+                   scale=0.5,
+                   # remove the colors of unsegmented pixels. This option is only available for segmentation models
+                   instance_mode=ColorMode.IMAGE_BW
+                   )
+    out = v.draw_instance_predictions(outputs["instances"].to("cpu"))
+    cv2.imwrite('./testing' + str(num) + '.jpg', out.get_image()[:, :, ::-1])

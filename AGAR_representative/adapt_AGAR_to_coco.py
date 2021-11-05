@@ -12,7 +12,7 @@ from glob import glob
 import cv2
 
 
-def agar_to_coco_format(img_dir, img_format, shape="rectangle", destination_image_source_dir=None):
+def agar_to_coco_format(img_dir, img_format, shape="rectangle", destination_image_source_dir=None, class_distinguish=False):
     current_img_id = 0
     output_l = []
     class_dict = {}
@@ -36,7 +36,7 @@ def agar_to_coco_format(img_dir, img_format, shape="rectangle", destination_imag
                 current_img_annotations.append({
                     'bbox': [annotation["x"], annotation["y"], annotation["x"] + annotation["width"], annotation["y"] + annotation["height"]],
                     'bbox_mode': BoxMode.XYXY_ABS,
-                    'category_id': list(class_dict.keys()).index(annotation["class"]),
+                    'category_id': list(class_dict.keys()).index(annotation["class"]) if class_distinguish else 0,
                     'segmentation': [[annotation["x"], annotation["y"], annotation["x"] + annotation["width"], annotation["y"] + annotation["height"]]]
                 })
 
@@ -60,6 +60,8 @@ def agar_to_coco_format(img_dir, img_format, shape="rectangle", destination_imag
 
     # print(output_l)
     print(class_dict)
+    if class_distinguish == False:
+        class_dict = {'colony': sum(list(class_dict.values()))}
 
     # save to json
     # with open('./' + outputRoot + '.json', 'w') as outfile:
