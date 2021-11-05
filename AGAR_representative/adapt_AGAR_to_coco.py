@@ -1,3 +1,6 @@
+from detectron2.data.catalog import Metadata
+from detectron2.utils.visualizer import Visualizer
+import random
 __author__ = "Tom Fu"
 __version__ = "1.0"
 
@@ -16,7 +19,6 @@ def agar_to_coco_format(img_dir, img_format, shape="rectangle", destination_imag
     class_num = 0
 
     for filename in glob(str(img_dir + '/*.' + img_format)):
-        print(filename)
         current_json_name = "/".join(filename.split(
             '/')[:-1]) + "/" + filename.split('/')[-1].split('.')[0] + '.json'
         with open(current_json_name) as f:
@@ -33,9 +35,9 @@ def agar_to_coco_format(img_dir, img_format, shape="rectangle", destination_imag
             if shape == "rectangle":
                 current_img_annotations.append({
                     'bbox': [annotation["x"], annotation["y"], annotation["x"] + annotation["width"], annotation["y"] + annotation["height"]],
-                    'bbox_mode': BoxMode,
-                    'category_id': class_dict[annotation["class"]],
-                    'segmentation': [annotation["x"], annotation["y"], annotation["x"] + annotation["width"], annotation["y"] + annotation["height"]]
+                    'bbox_mode': BoxMode.XYXY_ABS,
+                    'category_id': list(class_dict.keys()).index(annotation["class"]),
+                    'segmentation': [[annotation["x"], annotation["y"], annotation["x"] + annotation["width"], annotation["y"] + annotation["height"]]]
                 })
 
         # update source image directory in case files are moved to a different directory than initially processed
@@ -56,10 +58,37 @@ def agar_to_coco_format(img_dir, img_format, shape="rectangle", destination_imag
         output_l.append(current_img_dict)
         current_img_id += 1
 
-    print(output_l)
-    return output_l
+    # print(output_l)
+    print(class_dict)
+
+    # save to json
+    # with open('./' + outputRoot + '.json', 'w') as outfile:
+    #     json.dump(output_l, outfile)
+    return output_l, class_dict
 
 
 # img = cv2.imread(img)
-agar_to_coco_format(
-    '/Users/chenlianfu/Documents/Github/detectron2/AGAR_representative/lower-resolution', 'jpg')
+source_dir_path = '/Users/chenlianfu/Documents/Github/detectron2/AGAR_representative/lower-resolution'
+output_l, class_dict = agar_to_coco_format(
+    source_dir_path, 'jpg')
+
+# DatasetCatalog.register("agar_low", agar_to_coco_format(
+#     source_dir_path, 'jpg', outputRoot='low_res')[0])
+# MetadataCatalog.get("agar_low").set(thing_classes=class_dict.values())
+# agar_metadata = MetadataCatalog.get("agar_low")
+agar_metadata = Metadata()
+agar_metadata.set(thing_classes=list(class_dict.keys()))
+
+d = output_l[3]
+img = cv2.imread(d["file_name"])
+visualizer = Visualizer(img[:, :, ::-1], metadata=agar_metadata, scale=0.5)
+print(visualizer)
+print(d)
+out = visualizer.draw_dataset_dict(d)
+print(out.get_image().shape)
+print(out.get_image())
+print("AAAAAH")
+print(out.get_image()[:, :, ::-1].shape)
+print(out.get_image()[:, :, ::-1])
+# cv2.imshow('', out.get_image()[:, :, ::-1])
+cv2.imwrite('./testing_training.jpg', out.get_image()[:, :, ::-1])
